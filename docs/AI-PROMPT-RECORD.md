@@ -1,113 +1,73 @@
-# AI-Assisted Engineering Prompt Record
+# Development Notes – Appointment Booking Service
 
-This file records the prompts used to guide the AI-assisted engineering workflow. The prompts below are consolidated, reproducible prompt records of the activities performed during the work; they are not represented as verbatim exports of separate chat messages. The implementation and test results were reviewed locally before submission.
+## AI-assisted development record
 
-## Prompt 1 — Requirement analysis and decomposition
+I used AI assistance during development to understand the requirements, work through the booking logic, identify edge cases, and review the implementation.
 
-> Analyze the Appointment B scheduling assignment before proposing code. Extract the functional requirements, scope boundaries, acceptance criteria, assumptions, service boundary, booking invariant, edge cases, and a small implementation plan. If no starter project is supplied, use the explicitly permitted in-memory service fallback. Do not add a frontend, database, authentication, notifications, recurring availability, or deployment.
+The following are the main prompts and development tasks covered during the process.
 
-**AI contribution:** Structured the requirements and highlighted the interval invariant, cancellation semantics, UTC requirement, and required verification evidence.
+### 1. Understanding the requirements
 
-**Decision:** Accepted the bounded service approach. The solution stays within the fallback scope and does not add a database or frontend.
+> Review the appointment booking assignment and identify the required functionality, API operations, validation rules, and important edge cases. Keep the implementation within the scope of the assignment.
 
-**Informed:** `README.md`, `docs/DESIGN.md`, service and test decomposition.
+### 2. Appointment conflict handling
 
-## Prompt 2 — Booking domain and conflict invariant
+> Help me implement the appointment overlap check. A provider should not have two active appointments at the same time. Back-to-back appointments should be allowed, and appointments for different providers should not conflict. Explain the logic with examples.
 
-> Design and implement a small JavaScript appointment booking service using an in-memory repository. Validate non-empty provider and appointment identifiers, explicit-timezone ISO-8601 timestamps, and a strictly positive interval. Normalize instants to UTC. Reject duplicate appointment IDs. Prevent overlap only for active appointments belonging to the same provider. Use half-open intervals [start, end), with the conflict predicate `newStart < existingEnd && newEnd > existingStart`. Ensure a rejected operation does not mutate stored appointments. Explain the algorithm and its edge cases.
+### 3. Implementing the booking service
 
-**AI contribution:** Suggested the half-open interval model and the standard overlap predicate.
+> Implement the appointment booking functionality using Node.js. Support creating, listing, retrieving, and cancelling appointments. Keep the implementation simple and avoid unnecessary dependencies.
 
-**Decision:** Accepted the predicate and independently checked partial overlap, identical intervals, containment in both directions, and exact adjacency. Validation occurs before insertion.
+### 4. Input validation
 
-**Informed:** `src/booking-service.js`, `docs/DESIGN.md`, `test/booking-service.test.js`.
+> Review the appointment creation logic and handle missing fields, invalid provider IDs, invalid timestamps, and cases where the end time is earlier than or equal to the start time. Ensure invalid requests do not modify the stored data.
 
-## Prompt 3 — Cancellation behavior
+### 5. Date and time handling
 
-> Add cancellation by appointment ID. Return a clear not-found result for an unknown ID and a clear already-cancelled result for a repeated cancellation. Retain the appointment record and cancellation status/timestamp for history. Ensure cancelled appointments are excluded from future conflict checks, so their time can be booked again. Do not delete the record.
+> Ensure appointment timestamps are handled consistently. Support timestamps containing UTC (`Z`) or an explicit time-zone offset. Compare appointments based on their actual time and reject invalid timestamp values.
 
-**AI contribution:** Recommended a status transition rather than deleting the appointment.
+### 6. Writing test cases
 
-**Decision:** Accepted. Cancellation retains the record and marks it cancelled; conflict detection considers active records only.
+> Write test cases covering successful appointment creation, retrieving appointments, listing appointments, cancellation, overlapping appointments, adjacent appointments, different providers, invalid inputs, and unknown appointment IDs. Also verify that cancelled appointments do not block future bookings.
 
-**Informed:** `src/booking-service.js`, cancellation tests, `docs/DESIGN.md`.
+### 7. Implementing HTTP endpoints
 
-## Prompt 4 — Focused automated tests
+> Expose the appointment service through HTTP endpoints for health checks, creating appointments, listing appointments, retrieving an appointment by ID, and cancelling an appointment. Return appropriate HTTP status codes and JSON error messages.
 
-> Create focused automated tests using the built-in Node.js test runner. Cover successful booking, same-provider overlap, adjacency, different providers, cancellation and rebooking, missing and already-cancelled IDs, missing identifiers, malformed or timezone-less timestamps, invalid intervals, duplicate IDs, no mutation on failure, and overlapping concurrent calls. Add HTTP integration tests for create, read, list, conflict, cancellation, rebooking, malformed JSON, invalid requests, and concurrent requests. Do not weaken the invariant to make a test pass.
+### 8. Code review
 
-**AI contribution:** Proposed a scenario matrix and test cases beyond the minimum acceptance list.
+> Review the implementation for potential issues in the booking conflict logic, input validation, date handling, duplicate IDs, cancellation behaviour, and API responses. Identify missing edge cases and suggest improvements without introducing unnecessary complexity.
 
-**Decision:** Accepted and expanded the test coverage. Tests were executed locally using `npm test`; the current suite reports 20 passing tests.
+### 9. Documentation
 
-**Informed:** `test/booking-service.test.js`, `test/http-api.test.js`.
+> Prepare the project documentation with setup instructions, API endpoint details, request examples, validation rules, assumptions, and instructions for running the tests. Include the limitations of using in-memory storage.
 
-## Prompt 5 — Concurrency and persistence review
+## Implementation decisions
 
-> Review the booking operation for check-then-insert race conditions. Explain precisely what synchronous in-memory check-and-insert guarantees within one Node.js process, and what it does not guarantee across processes or server instances. Keep the assignment implementation minimal. Recommend a focused concurrency test and document the production persistence/transaction requirement without claiming distributed safety.
+- Appointment times are compared using their actual timestamps.
+- Input timestamps must include `Z` or an explicit UTC offset.
+- Appointment intervals follow the `[start, end)` convention. This allows one appointment to start exactly when another appointment ends.
+- The overlap condition for appointments belonging to the same provider is:
 
-**AI contribution:** Distinguished single-process synchronous execution from multi-instance concurrency and recommended documenting the boundary.
-
-**Decision:** Accepted. The service performs conflict-check and insertion synchronously in one process. No distributed-locking or database infrastructure was added. The limitation is documented.
-
-**Informed:** `src/booking-service.js`, `test/booking-service.test.js`, `test/http-api.test.js`, `docs/DESIGN.md`, `docs/LIMITATIONS.md`.
-
-## Prompt 6 — Minimal HTTP interface
-
-> Expose the same booking domain service through a minimal Node.js HTTP API. Support creating appointments, listing appointments, reading one appointment, and cancelling by ID. Keep business rules in the service, not in route handlers. Validate request bodies, return consistent JSON errors and appropriate HTTP status codes, handle malformed and oversized bodies, and do not introduce external dependencies or out-of-scope product features.
-
-**AI contribution:** Suggested a thin HTTP adapter over the domain service.
-
-**Decision:** Accepted with scope control. The API delegates booking decisions to the service and shares its in-memory repository. No frontend or third-party framework was introduced.
-
-**Informed:** `src/server.js`, `test/http-api.test.js`, `README.md`.
-
-## Prompt 7 — Independent review
-
-> Act as an independent reviewer. Compare the implementation with every assignment acceptance criterion. Look for interval boundary errors, timezone parsing mistakes, invalid-input mutation, duplicate IDs, cancellation behavior, race-condition overclaims, API error handling, and scope creep. Separate confirmed defects from production follow-up risks. Do not assume passing tests prove correctness; identify additional adversarial tests.
-
-**AI contribution:** Provided a review checklist and highlighted the need to state concurrency and persistence limitations accurately.
-
-**Decision:** Used as a checklist rather than accepting suggestions blindly. Edge cases were checked against implementation and tests. The documented multi-instance limitation was retained.
-
-**Informed:** Service, tests, `docs/DESIGN.md`, `docs/LIMITATIONS.md`.
-
-## Prompt 8 — Documentation and run instructions
-
-> Prepare concise reviewer-facing documentation for this bounded appointment feature. Include setup and run commands, API examples, service boundary, data model, booking invariant, UTC assumptions, persistence and concurrency approach, AI-use decisions, verification commands, and limitations. Only claim behavior that is present in the source and verified by tests.
-
-**AI contribution:** Drafted documentation structure and explanations.
-
-**Decision:** Edited documentation to match the actual code and test commands. Verification evidence is the local `npm test` run: 20 tests passed, 0 failed.
-
-**Informed:** `README.md`, `docs/DESIGN.md`, this file, `docs/LIMITATIONS.md`.
-
-## Verification evidence
-
-Run from the repository root:
-
-```bash
-npm test
+```js
+newStart < existingEnd && newEnd > existingStart
 ```
 
-Observed local result at packaging time:
+- Cancelled appointments are excluded from conflict checks.
+- Appointment data is currently maintained in an in-memory store.
 
-```text
-1..20
-# tests 20
-# pass 20
-# fail 0
-```
+## Scope and limitations
 
-The tests include unit-level booking/cancellation cases and HTTP integration cases. This evidence verifies the tested single-process behavior; it does not establish persistence across restarts or distributed concurrency across multiple service instances.
+This implementation is a prototype intended to demonstrate the appointment booking workflow and API behaviour.
 
+The current version does not include database persistence, authentication, notifications, recurring appointments, or deployment configuration.
 
-## Additional prompt — Resolve API route-not-found behavior
+Since the application uses in-memory storage, appointment data will be lost when the server restarts. A production implementation would require persistent storage and database-level transaction handling to prevent conflicting bookings across multiple server instances.
 
-**Prompt:** The candidate provided a response screenshot with `ROUTE_NOT_FOUND` and asked for an end-to-end working solution. The URL and HTTP method were not visible, so the exact failing route could not be identified.
+## Final verification
 
-**AI response summary:** Improve API discoverability and compatibility without changing the booking scope: add `GET /` route discovery, support `/api` and `/api/v1` mount prefixes and trailing slashes, handle CORS preflight, and distinguish unsupported methods (405) from unknown paths (404).
-
-**Decision:** Accepted. Implemented route normalization and discovery in `src/server.js`; added integration tests in `test/http-api.test.js`; documented the routes in `README.md` and `docs/DESIGN.md`.
-
-**Verification evidence:** `npm test` — 23 tests passed. `npm run test:coverage` — 23 tests passed; 96.63% overall line coverage. The screenshot did not include the requested URL/method, so the original trigger cannot be confirmed, but the updated service exposes its routes and supports the common path variants.
+- Run the test command mentioned in the README.
+- Verify that all test cases pass.
+- Check that the API endpoint paths and request examples match the implementation.
+- Verify the setup instructions from a fresh checkout.
+- Ensure no credentials, tokens, or sensitive environment files are committed.
