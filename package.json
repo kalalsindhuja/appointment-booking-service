@@ -1,0 +1,14 @@
+{
+  "name": "appointment-booking-service",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Real-time conflict-safe appointment booking REST API with in-memory persistence",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node src/cli.js",
+    "test": "node --test",
+    "test:coverage": "node --experimental-test-coverage --test"
+  }
+}
